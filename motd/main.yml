@@ -3,6 +3,7 @@
 # for the target systems
 #
 - name: Apply the message of the day
+  become: true
   hosts: all
   vars:
     message: "Today's message: Buy your admin a coffee!"

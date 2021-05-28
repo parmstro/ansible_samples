@@ -1,0 +1,100 @@
+---
+# TASK: main
+#
+# SUBTASKS:
+  # generate KEY
+  # generate CSR
+  # create HTTP service for target
+  # generate CRT
+  # add cert tracking to certmonger
+  #
+
+# currently neither the freeipa.ansible_freeipa collection nor the community collection support certificate management with ansible. 
+# we either resort to the API and a URI object or command line for this functionality
+# This task assumes the ipa client is installed and configured.
+
+- name: Set target service name
+  set_fact: 
+    target_service: "{{ crt_service_type }}/{{ ansible_fqdn }}"
+
+- name: Ensure target service is present
+  ipa_service:
+    name: "{{ target_service }}"
+    state: present
+    ipa_host: "{{ ipa_server_fqdn }}"
+    ipa_user: "{{ ipa_principal }}"
+    ipa_pass: "{{ ipa_password }}"
+
+- name: Create a secure directory 
+  file:
+    path: "{{ crt_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0600
+
+# certficate commands are not working even with pyOpenSSL > 16.0
+# Did *we* already create a cert i.e. we have one in this directory
+- name: Check for an existing certificate file
+  stat:
+    path: "{{ ssl_crt_path }}"
+  register: cert_exists
+
+- name: Cert exists and regen requested
+  block:
+
+  - name: Cert exists, regenerating, read existing cert
+    shell: "sed -n 2,$(expr $(wc -l < {{ ssl_crt_path }}) - 1)p {{ ssl_crt_path }}"
+    register: cert
+
+  - name: Cert exists, regenerating, get cert serial number
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-find --certificate='{{ cert.stdout }}' | grep 'Serial number:' | cut -c18-"
+    register: serial_num
+
+  - name: Cert exists, regenerating - stop tracking
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert stop-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -i {{ ansible_fqdn }}"
+    ignore_errors: true
+
+  - name: Cert exists, regenerating - remove the old cert from the service
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa service-remove-cert {{ target_service }} --certificate='{{ cert.stdout }}'"
+    ignore_errors: true
+
+  - name: Cert exists, revoke the old cert with reason 6 - certificateHold - an admin can completely revoke it later
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-revoke {{ serial_num.stdout_lines.1 }} --revocation-reason=6"
+  
+  - name: Cert exists, rename old cert .revoked
+    copy:
+      src: "{{ ssl_crt_path }}"
+      dest: "{{ ssl_crt_path }}.revoked"
+      remote_src: yes
+  
+  when: cert_exists.stat.exists and force_regen
+
+- name: Generating New Certificate
+  block:
+
+  - name: Generate configuration files
+    shell: "echo {{ ssl_private_key_passphrase }} > {{ passfile }}"
+
+  - command: "openssl genrsa -{{ ssl_private_key_cipher }} -out {{ ssl_private_key_pem_path }} -passout file:/{{ passfile }} {{ ssl_private_key_size }}"
+
+  - command: "openssl rsa -in {{ ssl_private_key_pem_path }} -out {{ ssl_private_key_path }} -passin file:/{{ passfile }}"
+
+  - name: Create request
+    command: "openssl req -new -key {{ ssl_private_key_path }} -out {{ csr_path }} -subj \"/C={{ csr_countryName }}/ST={{ csr_stateOrProvinceName }}/L={{ csr_localityName }}/O={{ csr_organizationName }}/OU={{ csr_organizationUnitName }}/CN={{ ansible_fqdn }}/subjectAltName=DNS.1={{ ansible_fqdn }}\""
+
+  - name: Generate the certificate for the service
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-request --add --principal={{ target_service }} {{ csr_path }} --certificate-out={{ ssl_crt_path }}"
+
+  - name: Ensure that certmonger starts-tracking the new certificate for autorenewals
+    shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert start-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -I {{ ansible_fqdn }}"
+
+  #- name: (workaround) Resubmit the request to ensure that the subjectAltName is included
+  #  shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert resubmit -i {{ ansible_fqdn }}  -K {{ target_service }} -D {{ ansible_fqdn }}"
+
+  - name: Create bundle of key and cert
+    shell: "cat {{ ssl_crt_path }} > {{ crt_key_bundle_path }}; cat {{ ssl_private_key_path }} >> {{ crt_key_bundle_path }};"
+
+  when: cert_exists.stat.exists == false or force_regen == true
+
+

@@ -1,0 +1,15 @@
+---
+# This play uses the motd role to update the motd page
+# for the target systems
+#
+- name: Apply the provisioning plays 
+  hosts: all
+  tasks:
+
+  - name: Include the MOTD play
+    include: motd/main.yml
+
+  - name: Include the cockpit certificates play
+    include: ipa_certs/cockpit_certs.yml
+
+ 

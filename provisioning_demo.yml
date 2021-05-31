@@ -5,11 +5,13 @@
 - name: Apply the provisioning plays 
   hosts: all
   tasks:
+  - debug:
+      msg: Post Provisioning Setup
 
-  - name: Include the MOTD play
-    include: motd/main.yml
+- name: Include the MOTD play
+  include: motd/main.yml
 
-  - name: Include the cockpit certificates play
-    include: ipa_certs/cockpit_certs.yml
+- name: Include the cockpit certificates play
+  include: ipa_certs/cockpit_certs.yml
 
  

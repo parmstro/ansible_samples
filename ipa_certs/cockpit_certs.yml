@@ -26,6 +26,13 @@
       enabled: true
       state: started
 
+  - name: ensure that the firewall is open
+    firewalld:
+      immediate: true
+      permanent: true
+      service: cockpit
+      state: enabled
+
   - name: Copy the certs to cockpit directory
     ansible.builtin.copy:
       src: "{{ crt_key_bundle_path }}"

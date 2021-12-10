@@ -27,7 +27,7 @@
       state: started
 
   - name: ensure that the firewall is open
-    firewalld:
+    ansible.posix.firewalld:
       immediate: true
       permanent: true
       service: cockpit

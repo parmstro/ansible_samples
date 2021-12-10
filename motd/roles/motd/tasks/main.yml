@@ -5,7 +5,7 @@
 #
 
 - name: Deploy the motd template
-  template:
+  ansible.builtin.template:
     src: motd.j2
     dest: /etc/motd
 

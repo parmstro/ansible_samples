@@ -16,7 +16,7 @@
 - name: Ensure chrony is running
   ansible.builtin.service:
     name: chronyd
-    state: restart
+    state: restarted
     enabled: true
 
 - name: Force chrony to correct the clock

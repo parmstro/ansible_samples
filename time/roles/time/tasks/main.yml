@@ -20,19 +20,26 @@
     enabled: true
 
 - name: Force chrony to correct the clock
-  ansible.builtin.command:
-    name: "chronyc makestep"
+  ansible.builtin.command: "chronyc makestep"
 
 - name: Gather stats
-  ansible.builtin.command:
-    name: "chronyc tracking"
+  ansible.builtin.command: "chronyc tracking"
   register: result
 
 - name: Output stats
   ansible.builtin.debug:
-    msg: result.stdout
+    var: result
 
 - name: Set the timezone
   community.general.timezone:
     hwclock: "UTC"
     name: "{{ timezone }}"
+
+- name: Gather stats
+  ansible.builtin.command: "timedatectl"
+  register: result
+
+- name: Output stats
+  ansible.builtin.debug:
+    var: result
+

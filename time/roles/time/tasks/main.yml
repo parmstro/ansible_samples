@@ -5,7 +5,8 @@
     name: ntpd
     state: stopped
     enabled: false
-
+  ignore_errors: true
+    
 - name: Configure chrony
   ansible.builtin.template:
     src: chrony.j2

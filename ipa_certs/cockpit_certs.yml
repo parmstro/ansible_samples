@@ -27,6 +27,12 @@
       state: started
 
   - name: ensure that the firewall is open
+    ansible.builtin.service:
+      name: firewalld
+      enabled: true
+      state: started
+
+  - name: ensure that the firewall is open
     ansible.posix.firewalld:
       immediate: true
       permanent: true

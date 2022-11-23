@@ -1,7 +1,7 @@
 # variables 
 
 ipa_domain: parmstrong.ca
-ipa_server_fqdn: idm10.parmstrong.ca
+ipa_server_fqdn: idm5.parmstrong.ca
 ipa_realm: PARMSTRONG.CA
 ipa_principal: generator
 ipa_password: "Legend2013"

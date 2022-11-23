@@ -15,9 +15,15 @@
 
   tasks:
 
-  - name: Ensure cockpit is installed
+  - name: Ensure cockpit packages are installed
     ansible.builtin.package:
-      name: cockpit
+      name: 
+        - cockpit
+        - cockpit-navigator
+        - cockpit-podman
+        - cockpit-session-recording
+        - cockpit-dashboard
+        - cockpit-pcp
       state: latest
 
   - name: ensure that cockpit is started

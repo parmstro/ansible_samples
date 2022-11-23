@@ -19,10 +19,8 @@
     ansible.builtin.package:
       name: 
         - cockpit
-        - cockpit-navigator
         - cockpit-podman
         - cockpit-session-recording
-        - cockpit-dashboard
         - cockpit-pcp
       state: latest
 

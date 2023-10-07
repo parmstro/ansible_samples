@@ -1,3 +1,5 @@
 collections:
-  - community.general
-  - community.posix
+  - name: community.general 
+    version: ">=7.0"
+  - name: ansible.posix
+  - name: redhat.satellite

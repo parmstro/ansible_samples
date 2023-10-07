@@ -4,6 +4,7 @@
 #
 - name: Apply the provisioning plays 
   hosts: all
+  become: true
   tasks:
   - debug:
       msg: Post Provisioning Setup
@@ -14,4 +15,5 @@
 - name: Include the cockpit certificates play
   import_playbook: ipa_certs/cockpit_certs.yml
 
- 
+- name: Include the time play
+  import_playbook: time/main.yml

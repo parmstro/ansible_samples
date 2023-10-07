@@ -1,17 +1,5 @@
 ---
-# TASK: main
-#
-# SUBTASKS:
-  # generate KEY
-  # generate CSR
-  # create HTTP service for target
-  # generate CRT
-  # add cert tracking to certmonger
-  #
-
-# currently neither the freeipa.ansible_freeipa collection nor the community collection support certificate management with ansible. 
-# we either resort to the API and a URI object or command line for this functionality
-# This task assumes the ipa client is installed and configured.
+# main tasks for setting up certificates
 
 - name: Set target service name
   set_fact: 
@@ -25,7 +13,7 @@
     ipa_user: "{{ ipa_principal }}"
     ipa_pass: "{{ ipa_password }}"
 
-- name: Create a secure directory 
+- name: Create a secure directory
   ansible.builtin.file:
     path: "{{ crt_dir }}"
     state: directory
@@ -33,12 +21,13 @@
     group: root
     mode: 0600
 
-# certficate commands are not working even with pyOpenSSL > 16.0
-# Did *we* already create a cert i.e. we have one in this directory
 - name: Check for an existing certificate file
   ansible.builtin.stat:
     path: "{{ ssl_crt_path }}"
   register: cert_exists
+
+- debug:
+    var: cert_exists.stat.exists
 
 - name: Cert exists and regen requested
   block:
@@ -48,19 +37,24 @@
     register: cert
 
   - name: Cert exists, regenerating, get cert serial number
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-find --certificate='{{ cert.stdout }}' | grep 'Serial number:' | cut -c18-"
+    ansible.builtin.shell: "ipa cert-find --services={{ target_service }} | grep 'Serial number:' | cut -c18-"
     register: serial_num
 
   - name: Cert exists, regenerating - stop tracking
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert stop-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -i {{ ansible_fqdn }}"
+    ansible.builtin.shell: "ipa-getcert stop-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -i {{ ansible_fqdn }}"
     ignore_errors: true
 
   - name: Cert exists, regenerating - remove the old cert from the service
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa service-remove-cert {{ target_service }} --certificate='{{ cert.stdout }}'"
+    ansible.builtin.shell: "ipa service-remove-cert {{ target_service }} --certificate='{{ cert.stdout }}'"
     ignore_errors: true
 
   - name: Cert exists, revoke the old cert with reason 6 - certificateHold - an admin can completely revoke it later
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-revoke {{ serial_num.stdout_lines.1 }} --revocation-reason=6"
+    ansible.builtin.shell: "ipa cert-revoke {{ serial_num.stdout }} --revocation-reason=6"
+    register: revocation
+    when: serial_num.stdout != ""
+
+  - debug:
+      var: revocation
   
   - name: Cert exists, rename old cert .revoked
     ansible.builtin.copy:
@@ -84,17 +78,14 @@
     ansible.builtin.command: "openssl req -new -key {{ ssl_private_key_path }} -out {{ csr_path }} -subj \"/C={{ csr_countryName }}/ST={{ csr_stateOrProvinceName }}/L={{ csr_localityName }}/O={{ csr_organizationName }}/OU={{ csr_organizationUnitName }}/CN={{ ansible_fqdn }}/subjectAltName=DNS.1={{ ansible_fqdn }}\""
 
   - name: Generate the certificate for the service
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa cert-request --add --principal={{ target_service }} {{ csr_path }} --certificate-out={{ ssl_crt_path }}"
+    ansible.builtin.shell: "echo '{{ ipa_password }}' | kinit {{ ipa_principal }};ipa cert-request --add --principal='{{ target_service }}' {{ csr_path }} --certificate-out={{ ssl_crt_path }}"
 
   - name: Ensure that certmonger starts-tracking the new certificate for autorenewals
-    ansible.builtin.shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert start-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -I {{ ansible_fqdn }}"
+    ansible.builtin.shell: "echo '{{ ipa_password }}' | kinit {{ ipa_principal }};ipa-getcert start-tracking -k {{ ssl_private_key_path }} -f {{ ssl_crt_path }} -I {{ ansible_fqdn }}"
 
-  #- name: (workaround) Resubmit the request to ensure that the subjectAltName is included
-  #  shell: "echo {{ ipa_password }} | kinit {{ ipa_principal }}; ipa-getcert resubmit -i {{ ansible_fqdn }}  -K {{ target_service }} -D {{ ansible_fqdn }}"
-
-  - name: Create bundle of key and cert
-    ansible.builtin.shell: "cat {{ ssl_crt_path }} > {{ crt_key_bundle_path }}; cat {{ ssl_private_key_path }} >> {{ crt_key_bundle_path }};"
+      # This deprecated in the latest cockpit deployments
+      #  - name: "Create bundle of key and cert"
+      #    ansible.builtin.shell: "cat {{ ssl_crt_path }} > {{ crt_key_bundle_path }}; cat {{ ssl_private_key_path }} >> {{ crt_key_bundle_path }};"
 
   when: cert_exists.stat.exists == false or force_regen == true
-
 

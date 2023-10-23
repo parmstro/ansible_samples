@@ -22,6 +22,7 @@
       state: present
 
   - name: Try to install other cockpit extensions
+    ansible.builtin.package:
       name: "{{ item }}"
       state: present
     loop:

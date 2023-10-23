@@ -28,6 +28,7 @@
     loop:
       - cockpit-podman
       - cockpit-pcp
+    ignore_errors: true
 
   - name: Ensure that cockpit is started
     ansible.builtin.service:

@@ -15,15 +15,18 @@
 
   tasks:
 
-  - name: Ensure cockpit packages are installed
+  - name: Ensure cockpit package are installed
     ansible.builtin.package:
       name:
         - cockpit
-        - cockpit-podman
-        - cockpit-session-recording
-        - cockpit-pcp
-      state: latest
-    ignore_errors: true
+      state: present
+
+  - name: Try to install other cockpit extensions
+      name: "{{ item }}"
+      state: present
+    loop:
+      - cockpit-podman
+      - cockpit-pcp
 
   - name: Ensure that cockpit is started
     ansible.builtin.service:

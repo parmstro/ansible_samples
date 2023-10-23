@@ -23,6 +23,7 @@
         - cockpit-session-recording
         - cockpit-pcp
       state: latest
+    ignore_errors: true
 
   - name: Ensure that cockpit is started
     ansible.builtin.service:

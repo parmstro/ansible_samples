@@ -48,13 +48,19 @@
     ansible.builtin.shell: "ipa service-remove-cert {{ target_service }} --certificate='{{ cert.stdout }}'"
     ignore_errors: true
 
-  - name: Cert exists, revoke the old cert with reason 6 - certificateHold - an admin can completely revoke it later
-    ansible.builtin.shell: "ipa cert-revoke {{ serial_num.stdout }} --revocation-reason=6"
-    register: revocation
-    when: serial_num.stdout != ""
+  - block:
+      - name: Cert exists, revoke the old cert with reason 6 - certificateHold - an admin can completely revoke it later
+        ansible.builtin.shell: "ipa cert-revoke {{ serial_num.stdout }} --revocation-reason=6"
+        register: revocation
+        when: serial_num.stdout != ""
 
-  - debug:
-      var: revocation
+    rescue:
+      
+
+      - name: If the return code is 127, the cert didn't exist
+        debug: 
+          msg: "The certificate did not exist - continuing"
+        when: revocation.rc == "127"
   
   - name: Cert exists, rename old cert .revoked
     ansible.builtin.copy:

@@ -49,13 +49,18 @@
       service: cockpit
       state: enabled
 
-  - name: Copy the crt to cockpit directory
+  - name: Clean up our files in the cockpit cert directory
+    ansible.builtin.file:
+      path: "/etc/cockpit/ws-cert/z-*"
+      state: absent
+
+  - name: Copy the crt to cockpit cert directory
     ansible.builtin.copy:
       src: "{{ ssl_crt_path }}"
       dest: "{{ cockpit_crt_path }}"
       remote_src: true
 
-  - name: Copy the key to cockpit directory
+  - name: Copy the key to cockpit cert directory
     ansible.builtin.copy:
       src: "{{ ssl_private_key_path }}"
       dest: "{{ cockpit_key_path }}"
